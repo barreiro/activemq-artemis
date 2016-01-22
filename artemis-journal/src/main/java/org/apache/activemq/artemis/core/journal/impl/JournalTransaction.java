@@ -45,7 +45,7 @@ public class JournalTransaction {
 
    private boolean compacting = false;
 
-   private Map<JournalFile, TransactionCallback> callbackList;
+   private final Map<JournalFile, TransactionCallback> callbackList;
 
    private JournalFile lastFile = null;
 
@@ -54,6 +54,7 @@ public class JournalTransaction {
    public JournalTransaction(final long id, final JournalRecordProvider journal) {
       this.id = id;
       this.journal = journal;
+      this.callbackList = new HashMap<>();
    }
 
    public void replaceRecordProvider(final JournalRecordProvider provider) {
@@ -167,10 +168,11 @@ public class JournalTransaction {
       data.setNumberOfRecords(getCounter(currentFile));
    }
 
+   public TransactionCallback getCurrentCallback() {
+      return currentCallback;
+   }
+
    public TransactionCallback getCallback(final JournalFile file) throws Exception {
-      if (callbackList == null) {
-         callbackList = new HashMap<JournalFile, TransactionCallback>();
-      }
 
       currentCallback = callbackList.get(file);
 
@@ -179,13 +181,17 @@ public class JournalTransaction {
          callbackList.put(file, currentCallback);
       }
 
-      if (currentCallback.getErrorMessage() != null) {
-         throw ActiveMQExceptionType.createException(currentCallback.getErrorCode(), currentCallback.getErrorMessage());
-      }
-
       currentCallback.countUp();
 
       return currentCallback;
+   }
+
+   public void checkErrorCondition() throws Exception {
+      if (currentCallback != null) {
+         if (currentCallback.getErrorMessage() != null) {
+            throw ActiveMQExceptionType.createException(currentCallback.getErrorCode(), currentCallback.getErrorMessage());
+         }
+      }
    }
 
    public void addPositive(final JournalFile file, final long id, final int size) {
@@ -268,6 +274,7 @@ public class JournalTransaction {
       }
    }
 
+   // WARNING: this may throw ConcurrentModificationException. Stay away!
    public void waitCallbacks() throws InterruptedException {
       if (callbackList != null) {
          for (TransactionCallback callback : callbackList.values()) {
