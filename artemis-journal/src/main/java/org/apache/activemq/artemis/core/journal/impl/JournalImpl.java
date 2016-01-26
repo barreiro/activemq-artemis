@@ -701,7 +701,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                                final boolean sync,
                                final IOCompletion callback) throws Exception {
       checkJournalIsLoaded();
-
+      lineUpContext(callback);
       pendingRecords.add(id);
 
       appendExecutor.submit(new Runnable() {
@@ -709,9 +709,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
          public void run() {
             journalLock.readLock().lock();
             try {
-
-               lineUpContext(callback);
-
                JournalInternalRecord addRecord = new JournalAddRecord(true, id, recordType, record);
                JournalFile usedFile = appendRecord(addRecord, false, sync, null, callback);
                records.put(id, new JournalRecord(usedFile, addRecord.getEncodeSize()));
@@ -723,7 +720,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                           ", usedFile = " +
                           usedFile);
                }
-
             }
             catch (Exception e) {
                ActiveMQJournalLogger.LOGGER.error(e.getMessage(), e);
@@ -743,7 +739,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                                   final boolean sync,
                                   final IOCompletion callback) throws Exception {
       checkJournalIsLoaded();
-
+      lineUpContext(callback);
       checkKnownRecordID(id);
 
       appendExecutor.submit(new Runnable() {
@@ -751,9 +747,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
          public void run() {
             journalLock.readLock().lock();
             try {
-
-               lineUpContext(callback);
-
                JournalRecord jrnRecord = records.get(id);
                JournalInternalRecord updateRecord = new JournalAddRecord(false, id, recordType, record);
                JournalFile usedFile = appendRecord(updateRecord, false, sync, null, callback);
@@ -766,15 +759,14 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                           usedFile);
                }
 
-               // record== null here could only mean there is a compactor, and computing the delete should be done after
-               // compacting is done
+               // record==null here could only mean there is a compactor
+               // computing the delete should be done after compacting is done
                if (jrnRecord == null) {
                   compactor.addCommandUpdate(id, usedFile, updateRecord.getEncodeSize());
                }
                else {
                   jrnRecord.addUpdateFile(usedFile, updateRecord.getEncodeSize());
                }
-
             }
             catch (Exception e) {
                ActiveMQJournalLogger.LOGGER.error(e.getMessage(), e);
@@ -789,7 +781,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
    @Override
    public void appendDeleteRecord(final long id, final boolean sync, final IOCompletion callback) throws Exception {
       checkJournalIsLoaded();
-
+      lineUpContext(callback);
       checkKnownRecordID(id);
 
       appendExecutor.submit(new Runnable() {
@@ -797,14 +789,10 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
          public void run() {
             journalLock.readLock().lock();
             try {
-
                JournalRecord record = null;
-
                if (compactor == null) {
                   record = records.remove(id);
                }
-
-               lineUpContext(callback);
 
                JournalInternalRecord deleteRecord = new JournalDeleteRecord(id);
                JournalFile usedFile = appendRecord(deleteRecord, false, sync, null, callback);
@@ -813,15 +801,14 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                   JournalImpl.traceRecord("appendDeleteRecord::id=" + id + ", usedFile = " + usedFile);
                }
 
-               // record== null here could only mean there is a compactor, and computing the delete should be done after
-               // compacting is done
+               // record==null here could only mean there is a compactor
+               // computing the delete should be done after compacting is done
                if (record == null) {
                   compactor.addCommandDelete(id, usedFile);
                }
                else {
                   record.delete(usedFile);
                }
-
             }
             catch (Exception e) {
                ActiveMQJournalLogger.LOGGER.error(e.getMessage(), e);
@@ -849,7 +836,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
          public void run() {
             journalLock.readLock().lock();
             try {
-
                JournalInternalRecord addRecord = new JournalAddRecordTX(true, txID, id, recordType, record);
                JournalFile usedFile = appendRecord(addRecord, false, false, tx, null);
 
@@ -864,7 +850,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                }
 
                tx.addPositive(usedFile, id, addRecord.getEncodeSize());
-
             }
             catch (Exception e) {
                ActiveMQJournalLogger.LOGGER.error(e.getMessage(), e);
@@ -944,7 +929,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                }
 
                tx.addPositive(usedFile, id, updateRecordTX.getEncodeSize());
-
             }
             catch (Exception e) {
                ActiveMQJournalLogger.LOGGER.error(e.getMessage(), e);
@@ -984,7 +968,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                }
 
                tx.addNegative(usedFile, id);
-
             }
             catch (Exception e) {
                ActiveMQJournalLogger.LOGGER.error(e.getMessage(), e);
@@ -1016,6 +999,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                                    final IOCompletion callback) throws Exception {
 
       checkJournalIsLoaded();
+      lineUpContext(callback);
 
       final JournalTransaction tx = getTransactionInfo(txID);
       tx.checkErrorCondition();
@@ -1025,9 +1009,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
          public void run() {
             journalLock.readLock().lock();
             try {
-
-               lineUpContext(callback);
-
                JournalInternalRecord prepareRecord = new JournalCompleteRecordTX(TX_RECORD_TYPE.PREPARE, txID, transactionData);
                JournalFile usedFile = appendRecord(prepareRecord, true, sync, tx, callback);
 
@@ -1036,7 +1017,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                }
 
                tx.prepare(usedFile);
-
             }
             catch (Exception e) {
                ActiveMQJournalLogger.LOGGER.error(e.getMessage(), e);
@@ -1075,6 +1055,9 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                                   final IOCompletion callback,
                                   final boolean lineUpContext) throws Exception {
       checkJournalIsLoaded();
+      if (lineUpContext) {
+         lineUpContext(callback);
+      }
 
       final JournalTransaction tx = transactions.remove(txID);
 
@@ -1089,11 +1072,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
          public void run() {
             journalLock.readLock().lock();
             try {
-
-               if (lineUpContext) {
-                  lineUpContext(callback);
-               }
-
                JournalInternalRecord commitRecord = new JournalCompleteRecordTX(TX_RECORD_TYPE.COMMIT, txID, null);
                JournalFile usedFile = appendRecord(commitRecord, true, sync, tx, callback);
 
@@ -1102,7 +1080,6 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
                }
 
                tx.commit(usedFile);
-
             }
             catch (Exception e) {
                ActiveMQJournalLogger.LOGGER.error(e.getMessage(), e);
@@ -1118,6 +1095,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
    @Override
    public void appendRollbackRecord(final long txID, final boolean sync, final IOCompletion callback) throws Exception {
       checkJournalIsLoaded();
+      lineUpContext(callback);
 
       final JournalTransaction tx = transactions.remove(txID);
 
@@ -1132,14 +1110,10 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
          public void run() {
             journalLock.readLock().lock();
             try {
-
-               lineUpContext(callback);
-
                JournalInternalRecord rollbackRecord = new JournalRollbackRecordTX(txID);
                JournalFile usedFile = appendRecord(rollbackRecord, false, sync, tx, callback);
 
                tx.rollback(usedFile);
-
             }
             catch (Exception e) {
                ActiveMQJournalLogger.LOGGER.error(e.getMessage(), e);
