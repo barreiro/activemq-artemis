@@ -704,7 +704,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
       lineUpContext(callback);
       pendingRecords.add(id);
 
-      appendExecutor.submit(new Runnable() {
+      Future<?> result = appendExecutor.submit(new Runnable() {
          @Override
          public void run() {
             journalLock.readLock().lock();
@@ -730,6 +730,10 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
             }
          }
       });
+
+      if (sync && callback == null) {
+         result.get();
+      }
    }
 
    @Override
@@ -742,7 +746,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
       lineUpContext(callback);
       checkKnownRecordID(id);
 
-      appendExecutor.submit(new Runnable() {
+      Future<?> result = appendExecutor.submit(new Runnable() {
          @Override
          public void run() {
             journalLock.readLock().lock();
@@ -776,6 +780,10 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
             }
          }
       });
+
+      if (sync && callback == null) {
+         result.get();
+      }
    }
 
    @Override
@@ -784,7 +792,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
       lineUpContext(callback);
       checkKnownRecordID(id);
 
-      appendExecutor.submit(new Runnable() {
+      Future<?> result = appendExecutor.submit(new Runnable() {
          @Override
          public void run() {
             journalLock.readLock().lock();
@@ -818,6 +826,10 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
             }
          }
       });
+
+      if (sync && callback == null) {
+         result.get();
+      }
    }
 
    @Override
@@ -1004,7 +1016,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
       final JournalTransaction tx = getTransactionInfo(txID);
       tx.checkErrorCondition();
 
-      appendExecutor.submit(new Runnable() {
+      Future<?> result = appendExecutor.submit(new Runnable() {
          @Override
          public void run() {
             journalLock.readLock().lock();
@@ -1027,6 +1039,11 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
             }
          }
       });
+
+      if (sync && callback == null) {
+         result.get();
+         tx.checkErrorCondition();
+      }
    }
 
    @Override
@@ -1067,7 +1084,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
 
       tx.checkErrorCondition();
 
-      appendExecutor.submit(new Runnable() {
+      Future<?> result = appendExecutor.submit(new Runnable() {
          @Override
          public void run() {
             journalLock.readLock().lock();
@@ -1090,6 +1107,11 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
             }
          }
       });
+
+      if (sync && callback == null) {
+         result.get();
+         tx.checkErrorCondition();
+      }
    }
 
    @Override
@@ -1105,7 +1127,7 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
 
       tx.checkErrorCondition();
 
-      appendExecutor.submit(new Runnable() {
+      Future<?> result = appendExecutor.submit(new Runnable() {
          @Override
          public void run() {
             journalLock.readLock().lock();
@@ -1124,6 +1146,11 @@ public class JournalImpl extends JournalBase implements TestableJournal, Journal
             }
          }
       });
+
+      if (sync && callback == null) {
+         result.get();
+         tx.checkErrorCondition();
+      }
    }
 
    // XXX make it protected?
